@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -42,85 +43,84 @@ fun MainScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            // Timer Header
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFFE1BEE7), // Light purple
-                                Color(0xFFBA68C8)  // Medium purple
-                            )
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Custom Top Bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFE1BEE7),
+                            Color(0xFFBA68C8)
                         )
                     )
-                    .padding(16.dp)
+                )
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(
+                Text(
+                    text = "Track My Pregnancy",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF4A148C),
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Track My Pregnancy",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF4A148C)
+                        text = "Timmer - ${formatTime(timerSeconds)}",
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    Button(
+                        onClick = {
+                            if (isTimerRunning) {
+                                isTimerRunning = false
+                            } else {
+                                isTimerRunning = true
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isTimerRunning) Color(0xFFD32F2F) else Color(
+                                0xFF4CAF50
+                            )
+                        ),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier
+                            .height(36.dp)
+                            .widthIn(min = 80.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         Text(
-                            text = "Timmer - ${formatTime(timerSeconds)}",
-                            fontSize = 16.sp,
-                            color = Color(0xFF4A148C)
+                            text = if (isTimerRunning) "Stop" else "Start",
+                            fontSize = 14.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium
                         )
-
-                        Button(
-                            onClick = {
-                                if (isTimerRunning) {
-                                    isTimerRunning = false
-                                } else {
-                                    isTimerRunning = true
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isTimerRunning) Color(0xFFD32F2F) else Color(
-                                    0xFF4CAF50
-                                )
-                            ),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text(
-                                text = if (isTimerRunning) "Stop" else "Start",
-                                fontSize = 12.sp,
-                                color = Color.White
-                            )
-                        }
                     }
                 }
             }
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = Color(0xFF9C27B0),
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Vitals")
-            }
         }
-    ) { paddingValues ->
-        Column(
+
+        // Main Content
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .weight(1f)
         ) {
             if (vitalEntries.isEmpty()) {
                 // Empty state
@@ -128,12 +128,20 @@ fun MainScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "No vital entries yet.\nTap + to add your first entry!",
-                        fontSize = 16.sp,
-                        color = Color.Gray,
-                        lineHeight = 24.sp
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "No vital entries yet.",
+                            fontSize = 16.sp,
+                            color = Color.Gray
+                        )
+                        Text(
+                            text = "Tap + to add your first entry!",
+                            fontSize = 16.sp,
+                            color = Color.Gray
+                        )
+                    }
                 }
             } else {
                 // Vitals list
@@ -145,6 +153,19 @@ fun MainScreen(
                         VitalEntryCard(vitalEntry = vitalEntry)
                     }
                 }
+            }
+
+            // Floating Action Button
+            FloatingActionButton(
+                onClick = { showAddDialog = true },
+                containerColor = Color(0xFF9C27B0),
+                contentColor = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .navigationBarsPadding()
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add Vitals")
             }
         }
     }
