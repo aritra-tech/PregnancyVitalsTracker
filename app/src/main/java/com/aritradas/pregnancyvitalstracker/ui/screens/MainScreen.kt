@@ -36,7 +36,7 @@ fun MainScreen(
     val context = LocalContext.current
     val vitalEntries by vitalViewModel.allVitalEntriesFlow.collectAsState(initial = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
-    var currentTime by remember { mutableStateOf("00:00") }
+    var currentTime by remember { mutableStateOf("00:00:00") }
     var isTimerServiceRunning by remember { mutableStateOf(false) }
     var timerService: TimerService? by remember { mutableStateOf(null) }
     var isBound by remember { mutableStateOf(false) }
@@ -58,7 +58,7 @@ fun MainScreen(
         object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action == TimerService.ACTION_TIME_UPDATE) {
-                    val time = intent.getStringExtra(TimerService.EXTRA_TIME) ?: "00:00"
+                    val time = intent.getStringExtra(TimerService.EXTRA_TIME) ?: "00:00:00"
                     currentTime = time
                 }
             }

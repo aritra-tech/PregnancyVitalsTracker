@@ -37,7 +37,7 @@ class TimerService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     // Timer state management using StateFlow
-    private val _currentTime = MutableStateFlow("00:00")
+    private val _currentTime = MutableStateFlow("00:00:00")
     val currentTime: StateFlow<String> = _currentTime.asStateFlow()
 
     private val _isRunning = MutableStateFlow(false)
@@ -97,7 +97,7 @@ class TimerService : Service() {
         timerJob?.cancel()
         timerJob = null
         elapsedSeconds = 0 // Reset timer when stopped
-        _currentTime.value = "00:00"
+        _currentTime.value = "00:00:00"
 
         // Stop foreground service
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -112,7 +112,8 @@ class TimerService : Service() {
     private fun formatElapsedTime(totalSeconds: Int): String {
         val hours = totalSeconds / 3600
         val minutes = (totalSeconds % 3600) / 60
-        return String.format("%02d:%02d", hours, minutes)
+        val seconds = totalSeconds % 60
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
     }
 
     private fun sendTimeBroadcast(time: String) {
