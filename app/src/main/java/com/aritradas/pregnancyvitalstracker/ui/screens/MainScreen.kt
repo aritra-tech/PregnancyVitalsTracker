@@ -1,5 +1,7 @@
 package com.aritradas.pregnancyvitalstracker.ui.screens
 
+import android.content.*
+import android.os.IBinder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,16 +15,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aritradas.pregnancyvitalstracker.data.VitalEntry
+import com.aritradas.pregnancyvitalstracker.timer.TimerService
 import com.aritradas.pregnancyvitalstracker.ui.components.AddVitalDialog
 import com.aritradas.pregnancyvitalstracker.ui.components.VitalEntryCard
 import com.aritradas.pregnancyvitalstracker.viewmodel.VitalViewModel
-import kotlinx.coroutines.delay
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,23 +33,100 @@ import java.util.*
 fun MainScreen(
     vitalViewModel: VitalViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val vitalEntries by vitalViewModel.allVitalEntriesFlow.collectAsState(initial = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
-    var timerSeconds by remember { mutableStateOf(0) }
-    var isTimerRunning by remember { mutableStateOf(false) }
+    var currentTime by remember { mutableStateOf("00:00:00") }
+    var isTimerServiceRunning by remember { mutableStateOf(false) }
+    var timerService: TimerService? by remember { mutableStateOf(null) }
+    var isBound by remember { mutableStateOf(false) }
+    val serviceConnection = remember {
+        object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                val binder = service as TimerService.TimerBinder
+                timerService = binder.getService()
+                isBound = true
+            }
 
-    // Timer effect
-    LaunchedEffect(isTimerRunning) {
-        while (isTimerRunning) {
-            delay(1000)
-            timerSeconds++
+            override fun onServiceDisconnected(name: ComponentName?) {
+                timerService = null
+                isBound = false
+            }
         }
+    }
+    val timeReceiver = remember {
+        object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == TimerService.ACTION_TIME_UPDATE) {
+                    val time = intent.getStringExtra(TimerService.EXTRA_TIME) ?: "00:00:00"
+                    currentTime = time
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(timerService) {
+        timerService?.currentTime?.collect { time ->
+            currentTime = time
+        }
+    }
+
+    LaunchedEffect(timerService) {
+        timerService?.isRunning?.collect { running ->
+            isTimerServiceRunning = running
+        }
+    }
+
+    DisposableEffect(context) {
+        val intent = Intent(context, TimerService::class.java)
+        context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+
+        val filter = IntentFilter(TimerService.ACTION_TIME_UPDATE)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(timeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            ContextCompat.registerReceiver(
+                context,
+                timeReceiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+        }
+
+        onDispose {
+            if (isBound) {
+                context.unbindService(serviceConnection)
+            }
+            try {
+                context.unregisterReceiver(timeReceiver)
+            } catch (e: IllegalArgumentException) {
+                // Receiver was not registered
+            }
+        }
+    }
+
+    fun startTimerService() {
+        val intent = Intent(context, TimerService::class.java).apply {
+            action = TimerService.ACTION_START_TIMER
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
+    }
+
+    fun stopTimerService() {
+        val intent = Intent(context, TimerService::class.java).apply {
+            action = TimerService.ACTION_STOP_TIMER
+        }
+        context.startService(intent)
     }
 
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        // Custom Top Bar
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -80,7 +160,7 @@ fun MainScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Timmer - ${formatTime(timerSeconds)}",
+                        text = "Timer - $currentTime",
                         fontSize = 16.sp,
                         color = Color.White,
                         fontWeight = FontWeight.Medium
@@ -88,14 +168,14 @@ fun MainScreen(
 
                     Button(
                         onClick = {
-                            if (isTimerRunning) {
-                                isTimerRunning = false
+                            if (isTimerServiceRunning) {
+                                stopTimerService()
                             } else {
-                                isTimerRunning = true
+                                startTimerService()
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isTimerRunning) Color(0xFFD32F2F) else Color(
+                            containerColor = if (isTimerServiceRunning) Color(0xFFD32F2F) else Color(
                                 0xFF4CAF50
                             )
                         ),
@@ -106,7 +186,7 @@ fun MainScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         Text(
-                            text = if (isTimerRunning) "Stop" else "Start",
+                            text = if (isTimerServiceRunning) "Stop" else "Start",
                             fontSize = 14.sp,
                             color = Color.White,
                             fontWeight = FontWeight.Medium
@@ -116,7 +196,6 @@ fun MainScreen(
             }
         }
 
-        // Main Content
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -155,7 +234,6 @@ fun MainScreen(
                 }
             }
 
-            // Floating Action Button
             FloatingActionButton(
                 onClick = { showAddDialog = true },
                 containerColor = Color(0xFF9C27B0),
@@ -170,7 +248,6 @@ fun MainScreen(
         }
     }
 
-    // Show Add Dialog
     if (showAddDialog) {
         AddVitalDialog(
             onDismiss = { showAddDialog = false },
@@ -187,11 +264,4 @@ fun MainScreen(
             }
         )
     }
-}
-
-private fun formatTime(seconds: Int): String {
-    val hours = seconds / 3600
-    val minutes = (seconds % 3600) / 60
-    val secs = seconds % 60
-    return String.format("%02d:%02d", minutes, secs)
 }
